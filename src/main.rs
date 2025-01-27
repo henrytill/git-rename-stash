@@ -3,9 +3,6 @@ use std::{env, process};
 use git2::{Commit, Error, Repository};
 
 fn rename_stash(repo: &Repository, stash_index: usize, new_message: &str) -> Result<(), Error> {
-    // Get the stash reference
-    let _stash_ref = repo.find_reference("refs/stash")?;
-
     // Read the stash reflog
     let mut reflog = repo.reflog("refs/stash")?;
     let max_index = reflog.len();
