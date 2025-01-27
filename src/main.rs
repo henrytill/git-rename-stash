@@ -9,7 +9,7 @@ fn rename_stash(repo: &Repository, stash_index: usize, new_message: &str) -> Res
 
     if stash_index >= max_index {
         return Err(Error::from_str(&format!(
-            "Stash@{{{0}}} is out of range. Only {1} stash entries exist.",
+            "Invalid stash index: {} (max: {})",
             stash_index,
             max_index.saturating_sub(1)
         )));
