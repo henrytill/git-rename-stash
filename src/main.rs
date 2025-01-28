@@ -1,6 +1,6 @@
 use std::{env, process};
 
-use git2::{Commit, Error, Repository};
+use git2::{Error, Repository};
 
 fn rename_stash(repo: &Repository, stash_index: usize, new_message: &str) -> Result<(), Error> {
     // Read the stash reflog
@@ -15,42 +15,22 @@ fn rename_stash(repo: &Repository, stash_index: usize, new_message: &str) -> Res
         )));
     }
 
-    // Get the target stash entry
-    let target_entry = reflog
-        .get(stash_index)
-        .ok_or_else(|| Error::from_str("Failed to get stash entry"))?;
+    // Get and amend the commit
+    let new_commit_id = {
+        let target_entry = reflog
+            .get(stash_index)
+            .ok_or_else(|| Error::from_str("Failed to get stash entry"))?;
+        let stash_id = target_entry.id_new();
+        let commit = repo.find_commit(stash_id)?;
+        commit.amend(None, None, None, None, Some(new_message), None)?
+    };
 
-    let old_stash_oid = target_entry.id_new();
-
-    // Get the original stash commit
-    let stash_commit = repo.find_commit(old_stash_oid)?;
-
-    // Get the tree from the original commit
-    let tree = stash_commit.tree()?;
-
-    // Get the original author & committer
-    let author = stash_commit.author();
-    let committer = stash_commit.committer();
-
-    // Get the parents from the original commit
-    let parent_commits: Vec<Commit> = stash_commit.parents().collect();
-    let parent_refs: Vec<&Commit> = parent_commits.iter().collect();
-
-    // Create a new commit with the new message but same tree and parents
-    let new_stash_oid = repo.commit(
-        None,       // Don't update any references
-        &author,    // Original author
-        &committer, // Original committer
-        new_message,
-        &tree,
-        &parent_refs,
-    )?;
-
-    // First remove the old entry
-    reflog.remove(stash_index, false)?;
-    // Then add the new entry at the same position
-    reflog.append(new_stash_oid, &author, Some(new_message))?;
+    // Remove the old entry
+    reflog.remove(stash_index, true)?;
     reflog.write()?;
+
+    // Update the stash ref to point to the new commit
+    repo.reference("refs/stash", new_commit_id, true, new_message)?;
 
     Ok(())
 }
