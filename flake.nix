@@ -22,6 +22,7 @@
           };
           buildInputs = with pkgs; [ openssl ];
           nativeBuildInputs = with pkgs; [ pkg-config ];
+          nativeCheckInputs = with pkgs; [ git ];
           src = builtins.path {
             path = ./.;
             name = "git-rename-stash-src";

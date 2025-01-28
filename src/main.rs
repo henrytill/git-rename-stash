@@ -2,9 +2,9 @@ use std::{env, process};
 
 use git2::{Error, Repository};
 
-fn rename_stash(repo: &Repository, stash_index: usize, new_message: &str) -> Result<(), Error> {
+fn rename_stash(repo: &mut Repository, stash_index: usize, new_message: &str) -> Result<(), Error> {
     // Read the stash reflog
-    let mut reflog = repo.reflog("refs/stash")?;
+    let reflog = repo.reflog("refs/stash")?;
     let max_index = reflog.len();
 
     if stash_index >= max_index {
@@ -26,8 +26,7 @@ fn rename_stash(repo: &Repository, stash_index: usize, new_message: &str) -> Res
     };
 
     // Remove the old entry
-    reflog.remove(stash_index, true)?;
-    reflog.write()?;
+    repo.stash_drop(stash_index)?;
 
     // Update the stash ref to point to the new commit
     repo.reference("refs/stash", new_commit_id, true, new_message)?;
@@ -40,6 +39,24 @@ fn print_usage(program_name: &str) {
     println!("Example: {} 0 \"New stash message\"", program_name);
 }
 
+fn parse_stash_ref(stash_ref: &str) -> Result<usize, String> {
+    // Match stash@{N} format
+    if let Some(index) = stash_ref
+        .strip_prefix("stash@{")
+        .and_then(|s| s.strip_suffix("}"))
+        .and_then(|index_str| index_str.parse::<usize>().ok())
+    {
+        return Ok(index);
+    }
+
+    // Try parsing as plain number
+    if let Ok(index) = stash_ref.parse::<usize>() {
+        return Ok(index);
+    }
+
+    Err(format!("Invalid stash reference: {}", stash_ref))
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -49,10 +66,10 @@ fn main() {
     }
 
     // Parse stash index
-    let stash_index = match args[1].parse::<usize>() {
+    let stash_index = match parse_stash_ref(&args[1]) {
         Ok(index) => index,
-        Err(_) => {
-            eprintln!("Invalid stash index: {}", args[1]);
+        Err(e) => {
+            eprintln!("{}", e);
             process::exit(1);
         }
     };
@@ -64,7 +81,7 @@ fn main() {
     }
 
     // Open the repository
-    let repo = match Repository::open(".") {
+    let mut repo = match Repository::open(".") {
         Ok(repo) => repo,
         Err(e) => {
             eprintln!("Failed to open repository: {}", e);
@@ -73,7 +90,7 @@ fn main() {
     };
 
     // Rename the stash
-    match rename_stash(&repo, stash_index, new_message) {
+    match rename_stash(&mut repo, stash_index, new_message) {
         Ok(()) => println!("Successfully renamed stash {}", stash_index),
         Err(e) => {
             eprintln!("Error renaming stash: {}", e);
