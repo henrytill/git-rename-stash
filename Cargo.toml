@@ -7,7 +7,7 @@ authors = ["Henry Till <henrytill@gmail.com>"]
 repository = "https://github.com/henrytill/git-rename-stash"
 
 [dependencies]
-git2 = "0.20.0"
+git2 = "0.20.4"
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
